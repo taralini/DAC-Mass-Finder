@@ -140,12 +140,23 @@ def choose_space_for_dar(df: pd.DataFrame, dar_pref: str):
     return df.copy()
 
 def best_match_per_observed(df: pd.DataFrame, tol_mode: str) -> pd.DataFrame:
+    """Pick the lowest-error match per observed peak.
+    Robust to pandas versions by using a Series of integer indices, then .loc with a 1D numpy array.
+    """
     if df.empty:
         return df
     df = df.copy()
     df["abs_err"] = df["error_Da"].abs() if tol_mode == "Da" else df["error_ppm"].abs()
-    idx = df.groupby(["observed"], as_index=False)["abs_err"].idxmin()
-    return df.loc[idx].copy()
+    df = df[df["abs_err"].notna()]
+    if df.empty:
+        return df
+    idx_series = df.groupby("observed", sort=False)["abs_err"].idxmin()
+    try:
+        idx_values = idx_series.to_numpy()
+    except Exception:
+        idx_values = idx_series.values
+    best = df.loc[idx_values].sort_values("observed").reset_index(drop=True)
+    return best
 
 def dar_from_intensities(best_df: pd.DataFrame, obs_df: pd.DataFrame, intensity_col: str):
     if best_df.empty:
@@ -293,3 +304,4 @@ st.code("""observed_mass,intensity
 155800.1,120000
 158900.0,80000
 """, language="csv")
+
